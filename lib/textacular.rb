@@ -6,6 +6,8 @@ module Textacular
   autoload :FullTextIndexer,         'textacular/full_text_indexer'
   autoload :PostgresModuleInstaller, 'textacular/postgres_module_installer'
 
+  @@fuzzy_threshold = 0.1
+
   def self.searchable_language
     'english'
   end
@@ -33,6 +35,10 @@ module Textacular
     parsed_query_hash = parse_query_hash(query)
     similarities, conditions = fuzzy_similarities_and_conditions(parsed_query_hash)
     assemble_query(similarities, conditions, exclusive)
+  end
+
+  def set_fuzzy_threshold(val)
+    @@fuzzy_threshold = val
   end
 
   def method_missing(method, *search_terms)
@@ -149,7 +155,7 @@ module Textacular
   def assemble_query(similarities, conditions, exclusive)
     rank = connection.quote_column_name('rank' + rand(100000000000000000).to_s)
 
-    select("#{quoted_table_name + '.*,' if select_values.empty?} #{similarities.join(" + ")} AS #{rank}").
+    select("set_limit(#{@@fuzzy_threshold}); SELECT #{quoted_table_name + '.*,' if select_values.empty?} #{similarities.join(" + ")} AS #{rank}").
       where(conditions.join(exclusive ? " AND " : " OR ")).
       order("#{rank} DESC")
   end
